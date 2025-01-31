@@ -1,7 +1,11 @@
 // src/utils/base-pay.ts
+import { BASE_PAY_CEILING_2025, calculateFuturePayCeiling, AVERAGE_HISTORICAL_RAISE } from '../types';
+
 type GSPayTable = {
   [key: number]: number[];
 };
+
+const currentYear = new Date().getFullYear();
 
 const gsPayTable: GSPayTable = {
   1: [21403, 22117, 22828, 23535, 24246, 24678, 25381, 26091, 26114, 26775],
@@ -21,10 +25,47 @@ const gsPayTable: GSPayTable = {
   15: [120264, 124273, 128282, 132291, 136300, 140309, 144318, 148327, 152336, 156345],
 };
 
-export const calculateBasePay = (gsLevel: number, step: number): number => {
-  return Number((gsPayTable[gsLevel]?.[step - 1] || 0).toFixed(2));
+export const calculateBasePay = (
+  gsLevel: number, 
+  step: number, 
+  year: number = currentYear,
+  baseRaise: number = AVERAGE_HISTORICAL_RAISE
+): number => {
+  const rawBasePay = Number((gsPayTable[gsLevel]?.[step - 1] || 0).toFixed(2));
+  const ceiling = calculateFuturePayCeiling(year, baseRaise);
+  return Math.min(rawBasePay, ceiling);
 };
 
-export const calculateLocalityPay = (basePay: number, localityRate: number): number => {
-  return Number((basePay * (localityRate / 100)).toFixed(2));
+export const calculateLocalityPay = (
+  basePay: number, 
+  localityRate: number, 
+  year: number = currentYear,
+  baseRaise: number = AVERAGE_HISTORICAL_RAISE
+): number => {
+  const rawLocalityPay = Number((basePay * (localityRate / 100)).toFixed(2));
+  const ceiling = calculateFuturePayCeiling(year, baseRaise);
+  // Total pay (base + locality) cannot exceed ceiling
+  return Math.min(rawLocalityPay, ceiling - basePay);
+};
+
+// Calculate total pay with ceiling enforcement
+export const calculateTotalPay = (
+  gsLevel: number, 
+  step: number, 
+  localityRate: number, 
+  year: number = currentYear,
+  baseRaise: number = AVERAGE_HISTORICAL_RAISE
+): { basePay: number; localityPay: number } => {
+  const rawBasePay = calculateBasePay(gsLevel, step, year, baseRaise);
+  const rawLocalityPay = calculateLocalityPay(rawBasePay, localityRate, year, baseRaise);
+  const totalPay = rawBasePay + rawLocalityPay;
+  const ceiling = calculateFuturePayCeiling(year, baseRaise);
+
+  if (totalPay <= ceiling) {
+    return { basePay: rawBasePay, localityPay: rawLocalityPay };
+  }
+
+  // If total exceeds ceiling, adjust locality pay down
+  const adjustedLocalityPay = ceiling - rawBasePay;
+  return { basePay: rawBasePay, localityPay: Math.max(0, adjustedLocalityPay) };
 };

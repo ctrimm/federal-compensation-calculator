@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { calculateTotalCompensation } from '../utils/calculations';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { LocalityArea, CompensationResult } from '../types';
-import { Sankey, Rectangle, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { LocalityArea, CompensationResult, AVERAGE_HISTORICAL_RAISE, PplEvent, getMRA } from '../types';
+import { InputTabs } from './calculator/InputTabs';
+import { CompensationBreakdown } from './calculator/CompensationBreakdown';
+import { Projections } from './calculator/Projections';
+import { Retirement } from './calculator/Retirement';
+import { Analysis } from './calculator/Analysis';
 
 const CompensationCalculator: React.FC = () => {
   const [gsLevel, setGsLevel] = useState<string>('');
@@ -14,9 +16,33 @@ const CompensationCalculator: React.FC = () => {
   const [totalComp, setTotalComp] = useState<number>(0);
   const [compDetails, setCompDetails] = useState<CompensationResult | null>(null);
   const [tspContribution, setTspContribution] = useState<number>(5);
+  const [tspGrowthRate, setTspGrowthRate] = useState<number>(7);
+  const [retirementAge, setRetirementAge] = useState<number>(62);
+  const [currentAge, setCurrentAge] = useState<number>(30);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
+  const [serviceYears, setServiceYears] = useState<number>(0);
+  const [serviceMonths, setServiceMonths] = useState<number>(0);
+  const [pplEvents, setPplEvents] = useState<PplEvent[]>([]);
+  const [useBlanketRaise, setUseBlanketRaise] = useState<boolean>(false);
+  const [blanketRaiseValue, setBlanketRaiseValue] = useState<number>(AVERAGE_HISTORICAL_RAISE);
+  const [initialTspBalance, setInitialTspBalance] = useState<number>(0);
+  const [futureRaises, setFutureRaises] = useState<number[]>([]);
+  const [futureRaiseYears, setFutureRaiseYears] = useState<number>(3);
 
-  const tooltips = {
+  const currentYear = new Date().getFullYear();
+  const birthYear = currentYear - currentAge;
+  const mra = getMRA(birthYear);
+
+  // Calculate retirement eligibility
+  const yearsOfService = Math.round((serviceYears + (serviceMonths / 12)) * 10) / 10;
+  const eligibleMRA10 = currentAge >= mra && yearsOfService >= 10;
+  const eligibleImmediate = currentAge >= mra && yearsOfService >= 30;
+  const eligibleDeferred = yearsOfService >= 5;
+
+  // Format remaining years/service needed
+  const formatRemaining = (value: number) => Math.ceil(value);
+
+  const tooltips: Record<string, string> = {
     'Base Pay': "Base salary determined by GS level and step",
     'Locality Pay': "Additional pay based on your geographic location",
     'FEHB': "Federal Employees Health Benefits - Government pays ~72% of premiums",
@@ -24,6 +50,7 @@ const CompensationCalculator: React.FC = () => {
     'FERS Basic': "Federal Employees Retirement System - Defined benefit pension plan",
     'TSP Match': "Government matches up to 5% of your base pay contribution",
     'Leave Value': "Monetary value of annual & sick leave accrual",
+    'PPL Value': "Value of Paid Parental Leave events"
   };
 
   const localityAreas: LocalityArea[] = [
@@ -32,72 +59,66 @@ const CompensationCalculator: React.FC = () => {
     { id: 'NYC', name: 'New York-Newark, NY-NJ-CT-PA', rate: 35.28 },
   ];
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#8884d8'];
-
   const handleCalculate = () => {
     if (!gsLevel || !step || !locality) return;
     
     const localityRate = localityAreas.find(l => l.id === locality)?.rate || 0;
-    const result = calculateTotalCompensation(
-      parseInt(gsLevel), 
-      parseInt(step), 
-      localityRate,
-      tspContribution
-    );
-    console.log('Calculation Result:', {
+
+    console.log('Calculating with:', {
       gsLevel,
       step,
       localityRate,
       tspContribution,
-      result
+      serviceYears,
+      serviceMonths,
+      pplEvents,
+      futureRaises,
+      tspGrowthRate,
+      retirementAge,
+      currentAge,
+      useBlanketRaise,
+      blanketRaiseValue
     });
+
+    const result = calculateTotalCompensation(
+      parseInt(gsLevel), 
+      parseInt(step), 
+      localityRate,
+      tspContribution,
+      serviceYears,
+      serviceMonths,
+      pplEvents,
+      futureRaises,
+      tspGrowthRate,
+      retirementAge,
+      currentAge,
+      useBlanketRaise,
+      blanketRaiseValue,
+      initialTspBalance
+    );
+
+    console.log('Calculation result:', {
+      total: result.total,
+      basePay: result.basePay,
+      localityPay: result.localityPay,
+      projections: {
+        count: result.projections?.length,
+        first: result.projections?.[0],
+        last: result.projections?.[result.projections?.length - 1]
+      }
+    });
+
     setTotalComp(result.total);
     setCompDetails(result);
   };
 
-  const getSankeyData = () => {
-    if (!compDetails) return { nodes: [], links: [] };
-
-    return {
-      nodes: [
-        { name: "Base Pay" },
-        { name: "Locality Pay" },
-        { name: "FEHB" },
-        { name: "FEGLI" },
-        { name: "FERS Basic" },
-        { name: "TSP Match" },
-        { name: "Leave Value" },
-        { name: "Total Compensation" }
-      ],
-      links: [
-        { source: 0, target: 7, value: compDetails.basePay },
-        { source: 1, target: 7, value: compDetails.localityPay },
-        { source: 2, target: 7, value: compDetails.benefits.fehb },
-        { source: 3, target: 7, value: compDetails.benefits.fegli },
-        { source: 4, target: 7, value: compDetails.benefits.fers.basic },
-        { source: 5, target: 7, value: compDetails.benefits.fers.tsp_match },
-        { source: 6, target: 7, value: compDetails.benefits.leave.annual + compDetails.benefits.leave.sick }
-      ]
-    };
-  };
-
-  const getPieData = () => {
-    if (!compDetails) return [];
-
-    return [
-      { name: 'Base Pay', value: compDetails.basePay },
-      { name: 'Locality Pay', value: compDetails.localityPay },
-      { name: 'FEHB', value: compDetails.benefits.fehb },
-      { name: 'FEGLI', value: compDetails.benefits.fegli },
-      { name: 'FERS Basic', value: compDetails.benefits.fers.basic },
-      { name: 'TSP Match', value: compDetails.benefits.fers.tsp_match },
-      { name: 'Leave Value', value: compDetails.benefits.leave.annual + compDetails.benefits.leave.sick }
-    ];
-  };
-
   useEffect(() => {
     handleCalculate();
-  }, [gsLevel, step, locality, tspContribution]);
+  }, [
+    gsLevel, step, locality, tspContribution, serviceYears, serviceMonths,
+    pplEvents, futureRaises, tspGrowthRate, retirementAge, currentAge,
+    useBlanketRaise, blanketRaiseValue, initialTspBalance
+  ]);
 
   return (
     <div className="container mx-auto p-4">
@@ -108,79 +129,53 @@ const CompensationCalculator: React.FC = () => {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Input Your Details</CardTitle>
+            <CardTitle>Input Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="gs-level">GS Level</Label>
-                <Select value={gsLevel} onValueChange={setGsLevel}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select GS Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({length: 15}, (_, i) => (
-                      <SelectItem key={i+1} value={(i+1).toString()}>
-                        GS-{i+1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="step">Step</Label>
-                <Select value={step} onValueChange={setStep}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Step" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({length: 10}, (_, i) => (
-                      <SelectItem key={i+1} value={(i+1).toString()}>
-                        Step {i+1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="locality">Locality Pay Area</Label>
-                <Select value={locality} onValueChange={setLocality}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Locality" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {localityAreas.map(area => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="tsp">TSP Contribution (%)</Label>
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="25" 
-                    value={tspContribution} 
-                    onChange={(e) => setTspContribution(Number(e.target.value))}
-                    className="w-full"
-                  />
-                  <span className="w-12 text-right">{tspContribution}%</span>
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  Government matches up to 5% of your contribution
-                </p>
-              </div>
-            </div>
+              <InputTabs
+                gsLevel={gsLevel}
+                setGsLevel={setGsLevel}
+                step={step}
+                setStep={setStep}
+                locality={locality}
+                setLocality={setLocality}
+                serviceYears={serviceYears}
+                setServiceYears={setServiceYears}
+                serviceMonths={serviceMonths}
+                setServiceMonths={setServiceMonths}
+                currentAge={currentAge}
+                setCurrentAge={setCurrentAge}
+                tspContribution={tspContribution}
+                setTspContribution={setTspContribution}
+                tspGrowthRate={tspGrowthRate}
+                setTspGrowthRate={setTspGrowthRate}
+                retirementAge={retirementAge}
+                setRetirementAge={setRetirementAge}
+                initialTspBalance={initialTspBalance}
+                setInitialTspBalance={setInitialTspBalance}
+                pplEvents={pplEvents}
+                setPplEvents={setPplEvents}
+                useBlanketRaise={useBlanketRaise}
+                setUseBlanketRaise={setUseBlanketRaise}
+                blanketRaiseValue={blanketRaiseValue}
+                setBlanketRaiseValue={setBlanketRaiseValue}
+                futureRaises={futureRaises}
+                setFutureRaises={setFutureRaises}
+                futureRaiseYears={futureRaiseYears}
+                setFutureRaiseYears={setFutureRaiseYears}
+                localityAreas={localityAreas}
+                currentYear={currentYear}
+                mra={mra}
+                eligibleMRA10={eligibleMRA10}
+                eligibleImmediate={eligibleImmediate}
+                eligibleDeferred={eligibleDeferred}
+                formatRemaining={formatRemaining}
+                yearsOfService={yearsOfService}
+                AVERAGE_HISTORICAL_RAISE={AVERAGE_HISTORICAL_RAISE}
+              />
           </CardContent>
         </Card>
 
@@ -194,48 +189,26 @@ const CompensationCalculator: React.FC = () => {
               ${totalComp.toLocaleString()}
             </div>
             {compDetails && (
-              <table className="w-full mt-4">
-                <tbody>
-                  {[
-                    { label: 'Base Pay', value: compDetails.basePay },
-                    { label: 'Locality Pay', value: compDetails.localityPay },
-                    { label: 'Leave Value', value: compDetails.benefits.leave.annual + compDetails.benefits.leave.sick },
-                    { label: 'FEHB', value: compDetails.benefits.fehb },
-                    { label: 'TSP Match', value: compDetails.benefits.fers.tsp_match },
-                    { label: 'FERS Basic', value: compDetails.benefits.fers.basic },
-                    { label: 'FEGLI', value: compDetails.benefits.fegli },
-                  ].sort((a, b) => b.value - a.value).map((item, index) => (
-                    <tr key={item.label} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                      <td 
-                        className="p-2 border cursor-help relative"
-                        onMouseEnter={() => setShowTooltip(item.label)}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        {item.label}
-                        {showTooltip === item.label && (
-                          <div className="absolute left-0 top-full mt-1 bg-black text-white p-2 rounded text-sm z-10 w-64">
-                            {tooltips[item.label]}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 border text-right">${item.value.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <CompensationBreakdown
+                compDetails={compDetails}
+                showTooltip={showTooltip}
+                setShowTooltip={setShowTooltip}
+                tooltips={tooltips}
+              />
             )}
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="breakdown" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="breakdown">Compensation Breakdown</TabsTrigger>
-          <TabsTrigger value="pie">Pie Chart</TabsTrigger>
-          <TabsTrigger value="longterm">Long-term Benefits</TabsTrigger>
+      <Tabs defaultValue="current" className="mt-6">
+        <TabsList className="grid grid-cols-2 lg:grid-cols-4">
+          <TabsTrigger value="current">Current Benefits</TabsTrigger>
+          <TabsTrigger value="projections">Future Growth</TabsTrigger>
+          <TabsTrigger value="retirement">Retirement</TabsTrigger>
+          <TabsTrigger value="details">Detailed Analysis</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="breakdown">
+        <TabsContent value="current">
           <Card>
             <CardHeader>
               <CardTitle>Total Compensation Breakdown</CardTitle>
@@ -243,81 +216,23 @@ const CompensationCalculator: React.FC = () => {
             <CardContent>
               <div className="h-96">
                 {compDetails && (
-                  <Sankey
-                    width={800}
-                    height={400}
-                    data={getSankeyData()}
-                    node={<Rectangle fill="#0088FE" />}
-                    nodePadding={50}
-                    margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                  />
+                  <Analysis compDetails={compDetails} />
                 )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="pie">
-          <Card>
-            <CardHeader>
-              <CardTitle>Compensation Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-96">
-                {compDetails && (
-                  <PieChart width={800} height={400}>
-                    <Pie
-                      data={getPieData()}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={150}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {getPieData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="projections">
+          <Projections compDetails={compDetails} />
         </TabsContent>
 
-        <TabsContent value="longterm">
-          <Card>
-            <CardHeader>
-              <CardTitle>Long-term Benefits Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-2">Annual Leave Accrual</h3>
-                  <p>0-3 years: 4 hours per pay period (13 days/year)</p>
-                  <p>3-15 years: 6 hours per pay period (20 days/year)</p>
-                  <p>15+ years: 8 hours per pay period (26 days/year)</p>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold mb-2">FERS Retirement Benefits</h3>
-                  <p>Basic Benefit Plan: 1% of high-3 average salary × years of service</p>
-                  <p>TSP: Up to 5% government matching</p>
-                  <p>Social Security Benefits</p>
-                </div>
+        <TabsContent value="retirement">
+          <Retirement compDetails={compDetails} />
+        </TabsContent>
 
-                <div>
-                  <h3 className="font-semibold mb-2">Other Benefits</h3>
-                  <p>Sick Leave: 4 hours per pay period (13 days/year)</p>
-                  <p>Health Insurance: FEHB with government contribution</p>
-                  <p>Life Insurance: FEGLI options</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="details">
+          <Analysis compDetails={compDetails} />
         </TabsContent>
       </Tabs>
     </div>
