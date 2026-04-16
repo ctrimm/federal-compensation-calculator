@@ -185,7 +185,7 @@ const CompensationCalculator: React.FC = () => {
             <CardDescription>Your total compensation package value</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-6xl font-bold text-center p-8">
+            <div className="text-6xl font-bold text-center p-8" aria-live="polite">
               ${totalComp.toLocaleString()}
             </div>
             {compDetails && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Input } from "../ui/input";
 import { LocalityArea, PplEvent } from '../../types';
 import { BasicInputProps, FineTuningProps } from './types';
 
@@ -90,7 +91,7 @@ export const InputTabs: React.FC<InputTabsProps> = ({
           <div>
             <Label htmlFor="gs-level">GS Level</Label>
             <Select value={gsLevel} onValueChange={setGsLevel}>
-              <SelectTrigger>
+              <SelectTrigger id="gs-level">
                 <SelectValue placeholder="Select GS Level" />
               </SelectTrigger>
               <SelectContent>
@@ -106,7 +107,7 @@ export const InputTabs: React.FC<InputTabsProps> = ({
           <div>
             <Label htmlFor="step">Step</Label>
             <Select value={step} onValueChange={setStep}>
-              <SelectTrigger>
+              <SelectTrigger id="step">
                 <SelectValue placeholder="Select Step" />
               </SelectTrigger>
               <SelectContent>
@@ -122,7 +123,7 @@ export const InputTabs: React.FC<InputTabsProps> = ({
           <div>
             <Label htmlFor="locality">Locality Pay Area</Label>
             <Select value={locality} onValueChange={setLocality}>
-              <SelectTrigger>
+              <SelectTrigger id="locality">
                 <SelectValue placeholder="Select Locality" />
               </SelectTrigger>
               <SelectContent>
@@ -140,24 +141,24 @@ export const InputTabs: React.FC<InputTabsProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="years">Years</Label>
-                <input
+                <Input
+                  id="years"
                   type="number"
                   min="0"
                   max="30"
                   value={serviceYears}
                   onChange={(e) => setServiceYears(Number(e.target.value))}
-                  className="w-full p-2 border rounded"
                 />
               </div>
               <div>
                 <Label htmlFor="months">Months</Label>
-                <input
+                <Input
+                  id="months"
                   type="number"
                   min="0"
                   max="11"
                   value={serviceMonths}
                   onChange={(e) => setServiceMonths(Number(e.target.value))}
-                  className="w-full p-2 border rounded"
                 />
               </div>
             </div>
@@ -165,13 +166,13 @@ export const InputTabs: React.FC<InputTabsProps> = ({
 
           <div>
             <Label htmlFor="currentAge">Current Age</Label>
-            <input
+            <Input
+              id="currentAge"
               type="number"
               min="18"
               max="70"
               value={currentAge}
               onChange={(e) => setCurrentAge(Number(e.target.value))}
-              className="w-full p-2 border rounded"
             />
             <p className="text-sm text-gray-500 mt-1">
               Your Minimum Retirement Age (MRA): {mra}
@@ -182,13 +183,15 @@ export const InputTabs: React.FC<InputTabsProps> = ({
                     <div>
                       <Label htmlFor="tsp">TSP Contribution (%)</Label>
                       <div className="flex items-center gap-2">
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="25" 
-                          value={tspContribution} 
+                        <input
+                          id="tsp"
+                          type="range"
+                          min="0"
+                          max="25"
+                          value={tspContribution}
                           onChange={(e) => setTspContribution(Number(e.target.value))}
                           className="w-full"
+                          aria-label="TSP Contribution Percentage"
                         />
                         <span className="w-12 text-right">{tspContribution}%</span>
                       </div>
@@ -199,13 +202,13 @@ export const InputTabs: React.FC<InputTabsProps> = ({
 
                     <div>
                       <Label htmlFor="initialTspBalance">Current TSP Balance ($)</Label>
-                      <input
+                      <Input
+                        id="initialTspBalance"
                         type="number"
                         min="0"
                         step="1000"
                         value={initialTspBalance}
                         onChange={(e) => setInitialTspBalance(Number(e.target.value))}
-                        className="w-full p-2 border rounded"
                       />
                       <p className="text-sm text-gray-500 mt-1">
                         Your existing TSP balance for more accurate retirement projections
@@ -215,14 +218,14 @@ export const InputTabs: React.FC<InputTabsProps> = ({
 
           <div>
             <Label htmlFor="tspGrowth">TSP Growth Rate (%)</Label>
-            <input
+            <Input
+              id="tspGrowth"
               type="number"
               min="0"
               max="15"
               step="0.1"
               value={tspGrowthRate}
               onChange={(e) => setTspGrowthRate(Number(e.target.value))}
-              className="w-full p-2 border rounded"
             />
             <p className="text-sm text-gray-500 mt-1">
               Expected annual return on TSP investments
@@ -231,13 +234,13 @@ export const InputTabs: React.FC<InputTabsProps> = ({
 
           <div>
             <Label htmlFor="retirement">Retirement Age</Label>
-            <input
+            <Input
+              id="retirement"
               type="number"
               min={mra}
               max="75"
               value={retirementAge}
               onChange={(e) => setRetirementAge(Number(e.target.value))}
-              className="w-full p-2 border rounded"
             />
             <div className="text-sm text-gray-500 mt-1 space-y-1">
               <p>Retirement Eligibility:</p>
@@ -265,30 +268,31 @@ export const InputTabs: React.FC<InputTabsProps> = ({
               {pplEvents.map((event, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div className="flex-1">
-                    <Label>Month</Label>
-                    <input
+                    <Label htmlFor={`ppl-month-${index}`}>Month</Label>
+                    <Input
+                      id={`ppl-month-${index}`}
                       type="number"
                       min="1"
                       max="12"
                       value={event.month}
                       onChange={(e) => updatePplEvent(index, 'month', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
                     />
                   </div>
                   <div className="flex-1">
-                    <Label>Year</Label>
-                    <input
+                    <Label htmlFor={`ppl-year-${index}`}>Year</Label>
+                    <Input
+                      id={`ppl-year-${index}`}
                       type="number"
                       min={currentYear}
                       max={currentYear + 10}
                       value={event.year}
                       onChange={(e) => updatePplEvent(index, 'year', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
                     />
                   </div>
                   <button
                     onClick={() => removePplEvent(index)}
                     className="mt-6 p-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    aria-label="Remove PPL event"
                   >
                     Remove
                   </button>
@@ -308,45 +312,48 @@ export const InputTabs: React.FC<InputTabsProps> = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <input
+                  id="useBlanketRaise"
                   type="checkbox"
                   checked={useBlanketRaise}
                   onChange={(e) => setUseBlanketRaise(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <Label>Use same raise percentage for all years</Label>
+                <Label htmlFor="useBlanketRaise">Use same raise percentage for all years</Label>
               </div>
 
               {useBlanketRaise ? (
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
+                    id="blanketRaiseValue"
                     type="number"
                     min="0"
                     max="10"
                     step="0.1"
                     value={blanketRaiseValue}
                     onChange={(e) => setBlanketRaiseValue(Number(e.target.value))}
-                    className="w-full p-2 border rounded"
                   />
                   <span className="w-8">%</span>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <Label>Number of years to project:</Label>
-                    <input
+                    <Label htmlFor="futureRaiseYears">Number of years to project:</Label>
+                    <Input
+                      id="futureRaiseYears"
                       type="number"
                       min="1"
                       max={retirementAge - currentAge}
                       value={futureRaiseYears}
                       onChange={(e) => setFutureRaiseYears(Number(e.target.value))}
-                      className="w-24 p-2 border rounded"
+                      className="w-24"
                     />
                   </div>
                   <div className="space-y-2">
                     {Array.from({ length: futureRaiseYears }, (_, i) => currentYear + i + 1).map((year, index) => (
                       <div key={year} className="flex items-center gap-2">
                         <span className="w-12">{year}</span>
-                        <input
+                        <Input
+                          id={`future-raise-${year}`}
                           type="number"
                           min="0"
                           max="10"
@@ -358,7 +365,6 @@ export const InputTabs: React.FC<InputTabsProps> = ({
                             newRaises[index] = Number(e.target.value);
                             setFutureRaises(newRaises);
                           }}
-                          className="w-full p-2 border rounded"
                         />
                         <span className="w-8">%</span>
                       </div>

@@ -26,9 +26,14 @@ export const CompensationBreakdown: React.FC<CompensationBreakdownProps> = ({
         ].sort((a, b) => b.value - a.value).map((item, index) => (
           <tr key={item.label} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
             <td 
-              className="p-2 border cursor-help relative"
+              className="p-2 border cursor-help relative focus:bg-gray-100 outline-none"
               onMouseEnter={() => setShowTooltip(item.label)}
               onMouseLeave={() => setShowTooltip(null)}
+              onFocus={() => setShowTooltip(item.label)}
+              onBlur={() => setShowTooltip(null)}
+              tabIndex={0}
+              role="button"
+              aria-label={`View description for ${item.label}`}
             >
               {item.label}
               {showTooltip === item.label && (
